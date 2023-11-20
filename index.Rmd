@@ -78,7 +78,6 @@ Border_Views <- UT_data |>
   group_by(border_zipcode) |>
   summarize(ideology_mean = mean(Q20A)) 
   
-Border_Views
 ```
 
 Then, we create the histogram to compare the distribution of beliefs about immigration within the entire data set to the average view on immigration in El Paso. 
