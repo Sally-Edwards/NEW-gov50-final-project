@@ -1,6 +1,6 @@
 ---
 title: "Gov 50 Final Project"
-author: "Your Name Here"
+author: "Sally Edwards"
 description: "My final project"
 output:
   distill::distill_article:
@@ -11,4 +11,86 @@ output:
 
 ## Project thoughts
 
-I am interested in exploring data related to...
+I am interested in exploring data related to party identification in Texas as related to distance from the Texas/Mexico border.  The border debate which has taken over the GOP often portrays immigration issue as practically concerning for voters who live close to the border, while citizens who live farther away are more likely to take a moralistic view of the situation.  However, I would like to evaluate the extent of this truth -- as a Texan with family located in border cities and more interior towns, I can say from anecdotal evidence that this isn't always the case. I believe that using data science to inform the conversation could help to develop a more nuanced understanding of both the issue and Texan voter's opinions. 
+
+## Milestone 2 -- Hypothesis and Data (13 October 2023)
+
+For my final project, I want to examine the relationship between opinion on border security in Texas as compared to an individual’s hometown in Texas.  Simply put, does your proximity to the Texas/Mexico border have any effect on your view of the issue? As border security has become an increasingly salient issue on the national political stage, it is all too easy for national politicians to make sweeping generalizations about the opinions of Texas voters without diving into the nuances of the multifaceted demographic.  Immigration has become a central tenet of the GOP platform, and political figures — like our Governor, Greg Abbott or Senator Ted Cruz — have repeatedly framed the issue as immediately pressing and easily positionable.  However, I believe that individuals who live close to border towns will have a more nuanced view of this issue, possibly due to the fact that they have a higher personal relationship to the immigration process. My hypothesis is that individuals who are from border cities will view immigration as less of a pressing issue than individuals who live in rural areas farther away from the border.  In order to study the hypothesis, I plan to use data from August 2023 University of Texas/Texas Politics Project Poll.  My explanatory variable will be an individual’s zip code (“zipcode”), collected from individual respondents, and the outcome variable will be an individual’s view of immigration.  This is quantified in the Q20_grid_A, wherein individuals rank how seriously the perceive the threat of immigration, from “extremely serious” to “not serious” in a gradient of 5, along with options for “no opinion” or to skip.  If individuals with zip codes along the border rank their preferences from “not very serious” to “not serious” consistently while individuals in rural area rank it as a serious issue. then I believe my hypothesis will be proven.  However, if the opposite is true, such that individuals with zip codes along the border rank immigration as a serious issue (from 1-2) while individuals in rural area rank it as less serious — or if they align— then my hypothesis will be disproven.
+
+Data Sourced from the Texas Politics Project and the University of Texas at Austin: August 2023 University of Texas/Texas Politics Project Poll https://texaspolitics.utexas.edu/polling-data-archive
+
+Codebook -- paragraph references Q20 and “zipcode":
+https://texaspolitics.utexas.edu/sites/texaspolitics.utexas.edu/files/utex0055d_codebook.pdf
+
+Poll Summary: 
+https://texaspolitics.utexas.edu/sites/texaspolitics.utexas.edu/files/202308_poll_topline.pdf
+Poll Crosstabs:
+
+(https://texaspolitics.utexas.edu/sites/texaspolitics.utexas.edu/files/202308_poll_crosstabs.pdf
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library("haven")
+```
+
+First we download the `haven` package to import .sav files 
+
+```{r, eval = FALSE, message=FALSE}
+install.packages ("haven")
+```
+
+Second we call the data
+
+```{r}
+library(haven)
+UT_data <- read_sav("utex0055e_output.sav")
+UT_data |>
+  head()
+```
+
+Let's keep only zip codes for El Paso
+
+```{r}
+library(tidyverse)
+UT_data <- UT_data |>
+  mutate(border_zip = if_else(zipcode == 79901 | 79902 | 79903 | 79904 | 79905 | 79906 | 79907 | 79908 | 79910 | 79911 | 79912 | 79913 | 79914 | 79915 | 79916 | 79917 | 79918 | 79920 | 79922 | 79923 | 79924 | 79925 | 79926 | 79927 | 79929 | 79930 | 79931 | 79932 | 79934 | 79935 | 79936 | 79937 | 79938 | 79940 | 79941 | 79942 | 79943 | 79944 | 79945| 79946 | 79947 | 79948 | 79949 | 79950 | 79951 | 79952 | 79953 | 79954 | 79955 | 79958 | 79960 | 79961 | 79966 | 79968 | 79973 | 79974 | 79975 | 79976 | 79977 | 79978 | 79980 | 79982 | 79983 | 79984 | 79985 | 79986 | 79987 | 79988 | 79989 | 79990 | 79991 | 79992 | 79993 | 79994 | 79995 | 79996 | 79997 | 79998 | 79999, "El Paso", "Other"))
+
+```
+
+Then we plot
+
+```{r}
+El_Paso_Scatter <- ggplot(data = UT_data, mapping = aes(x = border_zip, y = Q20A)) +
+                        geom_jitter(alpha = 0.75, color = "violet")+
+  labs( x = "City",
+        y = "How Seriously Immigration is Viewed as Threat",
+        title = "Immigration Ideology in El Paso, TX")
+El_Paso_Scatter
+```
+##Milestone 4
+
+First, we calculate the average view toward immigration for individuals living in El Paso.  
+```{r}
+Border_Views <- UT_data |>
+   mutate(border_zipcode = if_else(zipcode == 79901 | 79902 | 79903 | 79904 | 79905 | 79906 | 79907 | 79908 | 79910 | 79911 | 79912 | 79913 | 79914 | 79915 | 79916 | 79917 | 79918 | 79920 | 79922 | 79923 | 79924 | 79925 | 79926 | 79927 | 79929 | 79930 | 79931 | 79932 | 79934 | 79935 | 79936 | 79937 | 79938 | 79940 | 79941 | 79942 | 79943 | 79944 | 79945| 79946 | 79947 | 79948 | 79949 | 79950 | 79951 | 79952 | 79953 | 79954 | 79955 | 79958 | 79960 | 79961 | 79966 | 79968 | 79973 | 79974 | 79975 | 79976 | 79977 | 79978 | 79980 | 79982 | 79983 | 79984 | 79985 | 79986 | 79987 | 79988 | 79989 | 79990 | 79991 | 79992 | 79993 | 79994 | 79995 | 79996 | 79997 | 79998 | 79999, "El Paso", "Other")) |>
+  group_by(border_zipcode) |>
+  summarize(ideology_mean = mean(Q20A)) 
+  
+Border_Views
+```
+
+Then, we create the histogram to compare the distribution of beliefs about immigration within the entire data set to the average view on immigration in El Paso. 
+```{r}
+zip_hist <- ggplot(data = UT_data, mapping = aes(x = Q20A)) +
+                        geom_histogram(binwidth = 0.5,
+                                       fill = "violet") + 
+  geom_vline(mapping = aes(xintercept = 1.79833), color = "navy", width = .25) +
+  labs(title = "Distribution of Immigration Ideology",
+       x = "View on Immigration", 
+       y = "Respondents", 
+       subtitle = "Views on immigration categorized with 1 being most welcoming and 4 being most restrictive.")
+zip_hist
+```
+This histogram shows that there is not great variance between the average view of immigration held by individuals who live on the border and the overall distribution of views on immigration held by the larger dataset.  The distribution of the dataset's overall ideology is clustered around the 1 and 2 range (views more favorable to the process of immigration), and the average value of the view of individuals who live on the border is approximately 1.80.  Thus, this indicate that my hypothesis was not true, and that the treatment of living in a border city does not have a substantive effect on views toward immigration.  
