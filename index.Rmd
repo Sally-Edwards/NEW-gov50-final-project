@@ -13,7 +13,7 @@ output:
 
 ```{r}
 ##packages
-install.packages ("haven")
+install.packages("haven")
 install.packages("kableExtra")
 install.packages("sf")
 install.packages("ggspatial", "rnaturalearth", "tidygeocoder", "maps")
