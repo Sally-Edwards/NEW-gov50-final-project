@@ -84,7 +84,7 @@ UT_data <- UT_data |>
   mutate(is_El_Paso = if_else(city == "El Paso", 1, 0))
 
 UT_data <- UT_data |>
-  mutate(im_id = if_else(Q20_grid_A == `1`|`2`, 0, 1))
+  mutate(im_id = if_else(Q20_grid_A == 1 | Q20_grid_A == 2, 0, 1))
 
 
 ##Then, let's make a scatter plot to examine the relationship between immigration ideology and border town residence. 
@@ -132,7 +132,7 @@ library(infer)
 set.seed(02138)
 
 ate_boots <- UT_data |>
-  specify(im_id ~ is_El_Paso) |>
+  specify(im_id ~ city) |>
   hypothesize(null = "independence") |>
   generate(reps = 1000, type = "bootstrap") |>
   calculate(stat = "diff in means")
@@ -146,7 +146,7 @@ Then, I will create a linear regression with the city of residence as the indepe
 ```{r}
 library(broom) 
 
-imid_city_change <- lm(Q20_grid_A ~ city + birthyr + hispanic)
+imid_city_change <- lm(im_id ~ city + birthyr + hispanic, data = UT_data)
 
 modelsummary :: modelsummary(
   imid_city_change, 
