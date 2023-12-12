@@ -42,8 +42,11 @@ state_map_data<- map('state', fill = TRUE, plot = FALSE) %>% st_as_sf()
 ggplot() +
   geom_sf(data = world_map_data) +
   geom_sf(data = state_map_data) +
-  geom_point(data = city_data, aes(x = long, y = lat), color = "navy", fill = "lavender" , pch=21, size=5, alpha=I(0.7))+
-  coord_sf(xlim = c(-107, -94), ylim = c(26,37))
+  geom_point(data = city_data, aes(x = -106.4850, y = 31.7619), color = "navy", fill = "lavender" , pch=21, size=5, alpha=I(0.7))+
+  coord_sf(xlim = c(-107, -94), ylim = c(26,37)) + 
+  labs(title = "Map of Texas",
+       x = "latitude",
+       y = "longitude") 
 ```
 
 I will primarily be examining this hypothesis through using the residents of the city of El Paso, TX, as a case study.  El Paso is one of Texas largest border cities, and is directly across the border from Juárez, Chihuahua, México.  In September of this year, El Paso's mayor Oscar Leeser said that the city has reached a "breaking point", as more than 2,000 migrants seek asylum in the city every day (https://www.reuters.com/world/americas/el-paso-texas-at-breaking-point-migrants-flood-border-mayor-says-2023-09-23/).  Thus, this provides a salient and immediate example of a border town which 
@@ -52,18 +55,16 @@ I will primarily be examining this hypothesis through using the residents of the
 ```{r}
 library(haven)
 library(kableExtra)
-UT_data <- read_sav("utex0055e_output.sav")
+UT_data <- read_sav("utex0055d_output.sav")
 
-UT_data_sample <- UT_data [1:5, c(1, 59, 161, 165, 166, 169)]
+UT_data_sample <- UT_data [1:5, c(1, 46, 161, 165, 166, 169)]
 
 UT_data_sample|>
   kbl()|>
   kable_material(c("striped", "hover"))
 ```
-
-
 ##Data
-In order to study the hypothesis, I plan to use data from August 2023 University of Texas/Texas Politics Project Poll.  My explanatory, independent variable will be an individual’s residential zip code (“zipcode”), collected from individual respondents, in the survey and the dependent variable will be an individual’s view of immigration.  This is quantified in the Q20_grid_A, wherein individuals rank how seriously the perceive the threat of immigration, from “not serious” (1) to "extremely serious" (4) along with options for “no opinion” or to skip.  If individuals with zip codes along the border rank their preferences from “not very serious” to “not serious” consistently while individuals in rural area rank it as a serious issue, then I believe my hypothesis will be proven.  However, if the opposite is true, such that individuals with zip codes along the border rank immigration as a serious issue (from 1-2) while individuals in rural area rank it as less serious — or if they align— then my hypothesis will be disproven.
+In order to study the hypothesis, I plan to use data from August 2023 University of Texas/Texas Politics Project Poll.  My explanatory, independent variable will be an individual’s residential zip code (“zipcode”), collected from individual respondents, in the survey and the dependent variable will be an individual’s view of immigration.  This is quantified in the Q20_grid_A, wherein individuals rank how seriously the perceive the threat of immigration, from “extremely serious” (1) to "not serious" (5) along with options for “no opinion” or to skip.  If individuals with zip codes along the border rank their preferences from “not very serious” to “not serious” consistently while individuals in rural area rank it as a serious issue, then I believe my hypothesis will be proven.  However, if the opposite is true, such that individuals with zip codes along the border rank immigration as a serious issue (from 1-2) while individuals in rural area rank it as less serious — or if they align— then my hypothesis will be disproven.
 
 Data Sourced from the Texas Politics Project and the University of Texas at Austin: August 2023 University of Texas/Texas Politics Project Poll https://texaspolitics.utexas.edu/polling-data-archive
 
@@ -78,12 +79,14 @@ Poll Crosstabs:
 
 ```{r}
 library(tidyverse)
-UT_data <- UT_data >
+UT_data <- UT_data |>
   mutate(city = if_else(countyname == "El Paso TX", "El Paso", "Av. Texas"))
-UT_data
+
+UT_data <- UT_data |>
+  mutate(im_id = if_else(Q20_grid_A == 1 |2, "0", "1"))
 
 ##Then, let's make a scatter plot to examine the relationship between immigration ideology and border town residence. 
-EP_Scatter <- ggplot(data = UT_data, mapping = aes(x = city, y = Q20A)) +
+EP_Scatter <- ggplot(data = UT_data, mapping = aes(x = city, y = Q20_grid_A)) +
                         geom_jitter(alpha = 0.75, color = "navy")+
   labs( x = "City",
         y = "How Seriously Immigration is Viewed as Threat",
@@ -96,7 +99,7 @@ EP_Scatter
 
 ```{r}
 UT_data |>
-  ggplot(aes(x = factor(city), y = Q20A)) +
+  ggplot(aes(x = factor(city), y = Q20_grid_A)) +
   geom_boxplot(color = "navy", fill = "lavender") + 
   labs(x = "City",
        y = "Ideology toward Immigration", 
@@ -109,7 +112,7 @@ UT_data |>
 
 imm_DIM<- UT_data |>
   group_by(city) |>
-  summarize(avg_im_id = mean(Q20A, na.rm = TRUE)) |>
+  summarize(avg_im_id = mean(Q20_grid_A, na.rm = TRUE)) |>
   pivot_wider(names_from = city, 
               values_from = avg_im_id) |>
   mutate(ATE = `El Paso` - `Av. Texas`) 
@@ -119,7 +122,7 @@ imm_DIM |>
   kable_material(c("striped", "hover"))
 ```
 
-rom this, we can see that there is a clear difference in immigration ideology depending on border town residence.  Resident in El Paso are more likely to have a warmer view torwards immigration (closer to 1), as compared to the average Texan. 
+From this, we can see that there is a clear difference in immigration ideology depending on border town residence.  Resident in El Paso are more likely to have a warmer view towards immigration (closer to 1), as compared to the average Texan. 
 
 From here, we must determine whether this difference is related to or caused by border town residence.  In order to do so, I will calculate the confidence interval for the above difference in means. 
 ```{r}
@@ -127,7 +130,7 @@ library(infer)
 set.seed(02138)
 
 ate_boots <- UT_data |>
-  specify(Q20A ~ city) |>
+  specify(Q20_grid_A ~ city) |>
   generate(reps = 1000, type = "bootstrap") |>
   calculate(stat = "diff in means", 
             order = c("El Paso", "Av. Texas"))
@@ -141,7 +144,7 @@ Then, I will create a linear regression with the city of residence as the indepe
 ```{r}
 library(broom) 
 
-imid_city_change <- lm(Q20A ~ city)
+imid_city_change <- lm(Q20_grid_A ~ city + birthyr + hispanic)
 
 modelsummary :: modelsummary(
   imid_city_change, 
