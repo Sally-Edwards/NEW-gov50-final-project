@@ -35,48 +35,153 @@ knitr::opts_chunk$set(echo = FALSE)
 library("haven")
 ```
 
-First we download the `haven` package to import .sav files 
+First we download the `haven` package to import .sav files.  We will also download the "kableExtra" package 
 
 ```{r, eval = FALSE, message=FALSE}
 install.packages ("haven")
 ```
-
-Second we call the data
-
+###Set Up
 ```{r}
-library(haven)
-UT_data <- read_sav("utex0055e_output.sav")
-UT_data |>
-  head()
+install.packages("kableExtra")
+install.packages("sf")
+install.packages("ggspatial", "rnaturalearth", "tidygeocoder", "maps")
+install.packages("rnaturalearthdata")
 ```
 
+INTRODUCTION
+
+##Examining the Data
+```{r}
+library(haven)
+library(kableExtra)
+UT_data <- read_sav("utex0055e_output.sav")
+
+UT_data_sample <- UT_data [1:5, c(1, 59, 161, 165, 166, 169)]
+
+UT_data_sample|>
+  kbl()|>
+  kable_material(c("striped", "hover"))
+```
+
+##Map of Texas
+```{r}
+library(sf)
+library(ggplot2)
+library(tidyverse)
+library(ggspatial)
+library(rnaturalearth)
+library(tidygeocoder)
+library(maps)
+```
+
+```{R}
+citylist = c('El Paso, Texas'
+            )
+
+city_data = tibble(location = citylist)
+
+city_data <- city_data |>
+  mutate(lat = 31.7619
+         ,long = 106.4850) 
+  
+city_data
+```
+
+```{r}
+world_map_data <- ne_countries(scale = "medium", returnclass = "sf")
+state_map_data <- map('state', fill = TRUE, plot = FALSE) %>% st_as_sf()
+
+ggplot() +
+  geom_sf(data = world_map_data) +
+  geom_sf(data = state_map_data) +
+  geom_point(data = city_data, aes(x = long, y = lat), color = "navy", fill = "lavender" , pch=21, size=5, alpha=I(0.7))+
+  coord_sf(xlim = c(-107, -94), ylim = c(26,37))
+```
+
+
+
+
+##Data Section
 Let's keep only zip codes for El Paso
 
 ```{r}
 library(tidyverse)
 UT_data <- UT_data |>
-  mutate(border_zip = if_else(zipcode == 79901 | 79902 | 79903 | 79904 | 79905 | 79906 | 79907 | 79908 | 79910 | 79911 | 79912 | 79913 | 79914 | 79915 | 79916 | 79917 | 79918 | 79920 | 79922 | 79923 | 79924 | 79925 | 79926 | 79927 | 79929 | 79930 | 79931 | 79932 | 79934 | 79935 | 79936 | 79937 | 79938 | 79940 | 79941 | 79942 | 79943 | 79944 | 79945| 79946 | 79947 | 79948 | 79949 | 79950 | 79951 | 79952 | 79953 | 79954 | 79955 | 79958 | 79960 | 79961 | 79966 | 79968 | 79973 | 79974 | 79975 | 79976 | 79977 | 79978 | 79980 | 79982 | 79983 | 79984 | 79985 | 79986 | 79987 | 79988 | 79989 | 79990 | 79991 | 79992 | 79993 | 79994 | 79995 | 79996 | 79997 | 79998 | 79999, "El Paso", "Other"))
+  mutate(city = if_else(countyname == "El Paso TX", "El Paso", "Av. Texas"))
+UT_data
 
-```
-
-Then we plot
-
-```{r}
-El_Paso_Scatter <- ggplot(data = UT_data, mapping = aes(x = border_zip, y = Q20A)) +
-                        geom_jitter(alpha = 0.75, color = "violet")+
+##Then, let's make a scatter plot to examine the relationship between immigration ideology and border town residence. 
+EP_Scatter <- ggplot(data = UT_data, mapping = aes(x = city, y = Q20A)) +
+                        geom_jitter(alpha = 0.75, color = "navy")+
   labs( x = "City",
         y = "How Seriously Immigration is Viewed as Threat",
-        title = "Immigration Ideology in El Paso, TX")
-El_Paso_Scatter
+        title = "Immigration Ideology in El Paso, TX") +
+  theme_minimal()
+EP_Scatter
 ```
 
-First, we calculate the average view toward immigration for individuals living in El Paso. We can then compare that to the distribution of Immigration ideologies across the study through plotting the mean onto a histogram distribution of the survey results. 
+##Final Project Results 
+
+```{r}
+UT_data |>
+  ggplot(aes(x = factor(city), y = Q20A)) +
+  geom_boxplot(color = "navy", fill = "lavender") + 
+  labs(x = "City",
+       y = "Ideology toward Immigration", 
+       title = "Relationship Between Zip Code and Immigration Ideology")+ 
+  theme_minimal()
+```
+
+```{r}
+##difference in means of immigration ideology and border town residence 
+imm_DIM<- UT_data |>
+  group_by(city) |>
+  summarize(avg_im_id = mean(Q20A, na.rm = TRUE)) |>
+  pivot_wider(names_from = city, 
+              values_from = avg_im_id) |>
+  mutate(ATE = `El Paso` - `Av. Texas`) 
+
+imm_DIM |>
+  kbl()|>
+  kable_material(c("striped", "hover"))
+```
+From this, we can see that there is a clear difference in immigration ideology depending on border town residence.  Resident in El Paso are more likely to have a warmer view torwards immigration (closer to 1), as compared to the average Texan. 
+
+From here, we must determine whether this difference is related to or caused by border town residence.  In order to do so, I will calculate the confidence interval for the above difference in means. 
+```{r}
+library(infer)
+set.seed(02138)
+
+ate_boots <- UT_data |>
+  specify(Q20A ~ city) |>
+  generate(reps = 1000, type = "bootstrap") |>
+  calculate(stat = "diff in means", 
+            order = c("El Paso", "Av. Texas"))
+
+ate_ci_95 <- ate_boots |>
+  get_confidence_interval (level = 0.95)
+ate_ci_95
+```
+Then, I will create a linear regression with the city of residence as the independent variable, and the immigration ideology as the dependent variable. 
+
+```{r}
+library(broom) 
+
+imid_city_change <- lm(Q20A ~ city)
+
+modelsummary :: modelsummary(
+  imid_city_change, 
+  statistic = c ("s.e. = {std.error}",
+                 "p = {p.value}"),
+  gof_map = c("nobs", "r.squared", "adj.r.squared"))
+```
+##Graveyard
 
 
 ```{r}
 Border_Views <- UT_data |>
-   mutate(border_zipcode = if_else(zipcode == 79901 | 79902 | 79903 | 79904 | 79905 | 79906 | 79907 | 79908 | 79910 | 79911 | 79912 | 79913 | 79914 | 79915 | 79916 | 79917 | 79918 | 79920 | 79922 | 79923 | 79924 | 79925 | 79926 | 79927 | 79929 | 79930 | 79931 | 79932 | 79934 | 79935 | 79936 | 79937 | 79938 | 79940 | 79941 | 79942 | 79943 | 79944 | 79945| 79946 | 79947 | 79948 | 79949 | 79950 | 79951 | 79952 | 79953 | 79954 | 79955 | 79958 | 79960 | 79961 | 79966 | 79968 | 79973 | 79974 | 79975 | 79976 | 79977 | 79978 | 79980 | 79982 | 79983 | 79984 | 79985 | 79986 | 79987 | 79988 | 79989 | 79990 | 79991 | 79992 | 79993 | 79994 | 79995 | 79996 | 79997 | 79998 | 79999, "El Paso", "Other")) |>
-  group_by(border_zipcode) |>
+  mutate(san_antonio = if_else(countyname == "Bexar TX", "San Antonio", "Av. Texas")) |>
+  group_by(san_antonio) |>
   summarize(ideology_mean = mean(Q20A)) 
   
 zip_hist <- ggplot(data = UT_data, mapping = aes(x = Q20A)) +
@@ -89,4 +194,4 @@ zip_hist <- ggplot(data = UT_data, mapping = aes(x = Q20A)) +
        subtitle = "Views on immigration categorized with 1 being most welcoming and 4 being most restrictive.")
 zip_hist
 ```
-This histogram shows that there is not great variance between the average view of immigration held by individuals who live on the border and the overall distribution of views on immigration held by the larger dataset.  The distribution of the dataset's overall ideology is clustered around the 1 and 2 range (views more favorable to the process of immigration), and the average value of the view of individuals who live on the border is approximately 1.80.  Thus, this indicate that my hypothesis was not true, and that the treatment of living in a border city does not have a substantive effect on views toward immigration.  
+This histogram shows that there is not great variance between the average view of immigration held by individuals who live on the border and the overall distribution of views on immigration held by the larger dataset.  The distribution of the dataset's overall ideology is clustered around the 1 and 2 range (views more favorable to the process of immigration), and the average value of the view of individuals who live on the border is approximately 1.80.  Thus, this indicate that my hypothesis was not true, and that the treatment of living in a border city does not have a substantive effect on views toward immigration. 
